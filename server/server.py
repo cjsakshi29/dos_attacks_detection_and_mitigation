@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, abort, after_this_request, redirect, url_for
+from flask import Flask, request, jsonify, render_template, abort, after_this_request, redirect, url_for, session
 from detector import TrustManager
 import os
 import time
@@ -94,6 +94,31 @@ def unblock_ip(ip):
         write_to_csv(log_entry)
         return redirect(url_for('dashboard'))
     return "IP not found", 404
+
+@app.route('/status_api')
+def status_api():
+    ip_summary = []
+    for ip, score in detector.trust_scores.items():
+        status, _ = detector.get_status(score)
+        ip_summary.append({
+            "ip": ip,
+            "score": f"{score:.1f}",
+            "status": status,
+            "requests": detector.response_stats.get(ip, {"total":0})["total"]
+        })
+    return jsonify({
+        "logs": list(reversed(activity_logs)),
+        "ip_summary": ip_summary,
+        "stats": {
+            "total_attacks": detector.total_attacks_detected,
+            "blocked_count": len(detector.currently_blocked_ips)
+        },
+        "last_updated": datetime.now().strftime("%H:%M:%S")
+    })
+
+@app.route('/attacker')
+def attacker_ui():
+    return render_template('attacker.html')
 
 @app.route('/api')
 def handle_api():

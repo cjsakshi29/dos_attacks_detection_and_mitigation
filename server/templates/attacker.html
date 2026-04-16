@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Stress Tester</title>
+    <style>
+        :root {
+            --bg: #09090b;
+            --surface: #18181b;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text: #f4f4f5;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--surface);
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin-top: 0; font-size: 24px; color: #fff; }
+        p { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 16px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 16px;
+            color: #fff;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-normal { background-color: var(--success); }
+        .btn-attack { background-color: var(--danger); }
+        .btn-stop { background-color: #52525b; display: none; }
+
+        .console {
+            background-color: #000;
+            border-radius: 8px;
+            padding: 16px;
+            height: 150px;
+            overflow-y: auto;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .log { margin: 4px 0; border-bottom: 1px solid #27272a; padding-bottom: 2px;}
+        .log-success { color: var(--success); }
+        .log-error { color: var(--danger); }
+        .log-warn { color: #eab308; }
+
+        input {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            width: 60px;
+            text-align: center;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🗡️ Network Tester Node</h1>
+        <p>Simulate mobile network traffic targeting the centralized SOC Server.</p>
+
+        <div class="controls">
+            <label>Requests:</label>
+            <input type="number" id="reqCount" value="50">
+            <label>Delay (ms):</label>
+            <input type="number" id="reqDelay" value="100">
+        </div>
+
+        <button class="btn btn-normal" id="btnNormal" onclick="startSim('normal')">Send Normal Traffic (1s delay)</button>
+        <button class="btn btn-attack" id="btnAttack" onclick="startSim('attack')">🚧 LAUNCH DDoS ATTACK</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopSim()">STOP SIMULATION</button>
+
+        <div class="console" id="console">
+            <div style="color: #52525b">Ready. Waiting for command...</div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        const consoleEl = document.getElementById('console');
+
+        function log(msg, type='normal') {
+            const div = document.createElement('div');
+            div.className = 'log log-' + type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            consoleEl.appendChild(div);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        async function startSim(mode) {
+            isRunning = true;
+            document.getElementById('btnNormal').style.display = 'none';
+            document.getElementById('btnAttack').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'block';
+
+            let count = parseInt(document.getElementById('reqCount').value);
+            let delay = mode === 'normal' ? 1000 : parseInt(document.getElementById('reqDelay').value);
+
+            log(`Starting ${mode.toUpperCase()} simulation... Target: ${count} reqs, Delay: ${delay}ms`, 'warn');
+
+            for (let i = 1; i <= count; i++) {
+                if (!isRunning) break;
+
+                try {
+                    const start = Date.now();
+                    const res = await fetch('/api', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload: "0".repeat(500) })
+                    });
+                    const diff = Date.now() - start;
+                    const data = await res.json();
+
+                    if (res.status === 200) {
+                        log(`[${i}/${count}] SUCCESS - Score: ${data.trust_score.toFixed(1)} (${diff}ms)`, 'success');
+                    } else if (res.status === 403) {
+                        log(`[${i}/${count}] BLOCKED 🚫 - Score: ${data.trust_score} - ${data.message}`, 'error');
+                        log(`Simulation HALTED completely due to firewall block.`, 'error');
+                        break;
+                    } else {
+                        log(`[${i}/${count}] Unexpected status: ${res.status}`, 'warn');
+                    }
+                } catch (e) {
+                    log(`[${i}/${count}] Network Error: ${e.message}`, 'error');
+                }
+
+                if (delay > 0) {
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+
+            stopSim();
+        }
+
+        function stopSim() {
+            isRunning = false;
+            document.getElementById('btnNormal').style.display = 'block';
+            document.getElementById('btnAttack').style.display = 'block';
+            document.getElementById('btnStop').style.display = 'none';
+            log('Simulation stopped.', 'warn');
+        }
+    </script>
+</body>
+</html>
