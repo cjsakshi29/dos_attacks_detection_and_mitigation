@@ -1,3 +1,4 @@
+import psutil
 import time
 from collections import deque
 import numpy as np
@@ -10,7 +11,8 @@ class TrustManager:
         self.base_penalty = base_penalty    # AI penalty weight
         
         # Thresholds
-        self.rps_threshold = 10.0
+        self.default_rps_threshold = 10.0
+        self.rps_threshold = self.default_rps_threshold
         self.rpm_threshold = 100.0
         self.byte_rate_limit = 500.0        # KB/s
         self.recovery_threshold = 25.0      # Seconds of inactivity before recovery
@@ -88,6 +90,15 @@ class TrustManager:
         # Cleanup byte history
         while self.byte_history[ip] and self.byte_history[ip][0][0] < now - 1.0:
             self.byte_history[ip].popleft()
+            
+        # 0. Adaptive Hardware Defense (Novelty)
+        cpu_load = psutil.cpu_percent(interval=None)
+        if cpu_load > 60.0:
+            # CPU is struggling, panic mode (stricter thresholds)
+            self.rps_threshold = max(3.0, self.rps_threshold - 1.0)
+        else:
+            # CPU is fine, relax thresholds back to normal
+            self.rps_threshold = min(self.default_rps_threshold, self.rps_threshold + 0.5)
             
         # 1. Calculate Volume Metrics
         rps = len(self.rps_history[ip])
@@ -170,7 +181,9 @@ class TrustManager:
             "kb_s": byte_rate,
             "ratio": ratio,
             "confidence": confidence,
-            "reason": ", ".join(reasons) if reasons else "Normal"
+            "reason": ", ".join(reasons) if reasons else "Normal",
+            "cpu": cpu_load,
+            "hw_threshold": self.rps_threshold
         }
         
         return current_score, label, metrics, is_blocked

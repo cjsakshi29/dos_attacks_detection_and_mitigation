@@ -1,4 +1,16 @@
-from flask import Flask, request, jsonify, render_template, abort, after_this_request, redirect, url_for
+from flask import Flask, request, jsonify, render_template, abort, after_this_request, redirect, url_for, send_file
+from detector import TrustManager
+import os
+import time
+import threading
+import csv
+from datetime import datetime
+import psutil
+import pandas as pd
+import matplotlib
+matplotlib.use('Agg') # Headless mode for server graphics
+import matplotlib.pyplot as plt
+import io
 from detector import TrustManager
 import os
 import time
@@ -94,6 +106,113 @@ def unblock_ip(ip):
         write_to_csv(log_entry)
         return redirect(url_for('dashboard'))
     return "IP not found", 404
+
+@app.route('/status_api')
+def status_api():
+    # Return current metrics to feed real-time Chart.js tracking
+    ip_summary = []
+    normal, suspicious, blocked = 0, 0, 0
+    total_trust = 0
+    
+    for ip, score in detector.trust_scores.items():
+        status, _ = detector.get_status(score)
+        total_trust += score
+        if status == 'NORMAL': normal += 1
+        elif status == 'SUSPICIOUS': suspicious += 1
+        else: blocked += 1
+        
+        ip_summary.append({
+            "ip": ip, "score": f"{score:.1f}", "status": status,
+            "requests": detector.response_stats.get(ip, {"total":0})["total"]
+        })
+        
+    avg_trust = (total_trust / len(detector.trust_scores)) if detector.trust_scores else 100
+    
+    return jsonify({
+        "logs": list(reversed(activity_logs))[:15],
+        "ip_summary": ip_summary,
+        "graphs": {
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "cpu": psutil.cpu_percent(),
+            "ram": psutil.virtual_memory().percent,
+            "avg_trust": avg_trust,
+            "rps": sum(len(hist) for hist in detector.rps_history.values()),
+            "normal_ips": normal,
+            "suspicious_ips": suspicious,
+            "blocked_ips": blocked
+        },
+        "stats": {
+            "total_attacks": detector.total_attacks_detected,
+            "blocked_count": len(detector.currently_blocked_ips),
+            "hw_threshold": detector.rps_threshold
+        }
+    })
+
+@app.route('/generate_report', methods=['POST'])
+def generate_report():
+    try:
+        start_datetime = request.form.get('start_time') # Format: 2026-04-16T13:00
+        end_datetime = request.form.get('end_time')
+        
+        if not os.path.exists(LOG_FILE):
+            return "No log data available.", 404
+            
+        # Analyze CSV Data
+        df = pd.read_csv(LOG_FILE)
+        
+        # Original timestamp in CSV is just HH:MM:SS format, so we map it to today's date for this simulation.
+        # Since the system logs only time currently, we assume the logs belong to the current day.
+        df['dt'] = pd.to_datetime('today').normalize() + pd.to_timedelta(df['Timestamp'])
+        
+        if start_datetime and end_datetime:
+            # Parse datetime-local strings
+            s_dt = pd.to_datetime(start_datetime)
+            e_dt = pd.to_datetime(end_datetime)
+            df = df[(df['dt'] >= s_dt) & (df['dt'] <= e_dt)]
+            
+        if len(df) == 0:
+            return "No data for selected timeframe.", 404
+            
+        # Draw the Graphs
+        plt.style.use('dark_background')
+        fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+        fig.suptitle(f'Security Performance/Analytics Report', fontsize=16)
+
+        # Graph 1: Traffic Volume over Time
+        axs[0].plot(df['Timestamp'], df['RPS'], label='RPS', color='#3b82f6')
+        axs[0].set_title('Network Volume (RPS)')
+        axs[0].set_ylabel('Requests / Sec')
+        axs[0].tick_params(axis='x', rotation=45)
+        # Limit x-ticks to prevent overlap
+        axs[0].xaxis.set_major_locator(plt.MaxNLocator(5))
+        
+        # Graph 2: Trust Score Degradation
+        axs[1].scatter(df['Timestamp'], df['Score'], color='#10b981', alpha=0.5)
+        axs[1].set_title('Trust Score Fluctuations')
+        axs[1].set_ylabel('Trust (0-100)')
+        axs[1].xaxis.set_major_locator(plt.MaxNLocator(5))
+        
+        # Graph 3: Threat Types
+        status_counts = df['Status'].value_counts()
+        colors = {'NORMAL': '#10b981', 'SUSPICIOUS': '#f59e0b', 'BLOCKED': '#ef4444'}
+        plot_colors = [colors.get(x, '#888') for x in status_counts.index]
+        axs[2].pie(status_counts, labels=status_counts.index, colors=plot_colors, autopct='%1.1f%%')
+        axs[2].set_title('Traffic Classification Distribution')
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        
+        # Save to memory
+        pdf_buffer = io.BytesIO()
+        plt.savefig(pdf_buffer, format='pdf')
+        pdf_buffer.seek(0)
+        plt.close(fig)
+        
+        filename = f"SOC_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+        
+    except Exception as e:
+        print(e)
+        return "Failed to generate report", 500
 
 @app.route('/api', methods=['GET', 'POST'])
 def handle_api():
