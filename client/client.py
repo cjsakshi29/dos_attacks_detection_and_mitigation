@@ -40,14 +40,14 @@ def send_requests(url, count, delay, mode):
                 msg = f"OK | Score: {score} | status: {status}"
             elif status_code == 403:
                 blocked_count += 1
-                msg = f"BLOCKED 🚫 | Score: {score}"
+                msg = f"BLOCKED | Score: {score}"
             else:
                 msg = f"Status {status_code}"
 
             print(f"[{i:03}] {msg} ({latency:3.0f}ms)")
             
             if status_code == 403:
-                print("\n🛑 IP has been blocked by the server. Simulation halted.")
+                print("\nIP has been blocked by the server. Simulation halted.")
                 break
 
         except requests.exceptions.RequestException as e:

@@ -28,7 +28,7 @@ class TrustManager:
         model_path = os.path.join(os.path.dirname(__file__), 'ddos_model.pkl')
         if os.path.exists(model_path):
             self.model = joblib.load(model_path)
-            print("🤖 [Detector] Machine Learning model loaded.")
+            print("[Detector] Machine Learning model loaded.")
         else:
             self.model = None
 
