@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Alert | Access Denied</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+
+        .alert-box {
+            max-width: 500px;
+            padding: 40px;
+            background: #161b22;
+            border: 1px solid #f85149;
+            border-radius: 12px;
+            box-shadow: 0 0 50px rgba(248, 81, 73, 0.1);
+        }
+
+        .icon {
+            font-size: 60px;
+            color: #f85149;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: #f85149;
+            margin: 0 0 10px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #8b949e;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .details {
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-bottom: 30px;
+            text-align: left;
+            border-left: 3px solid #f85149;
+        }
+
+        .btn {
+            display: inline-block;
+            background: transparent;
+            color: #58a6ff;
+            border: 1px solid #58a6ff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: #58a6ff;
+            color: #fff;
+        }
+
+        .reason { border-bottom: 1px dashed #30363d; padding-bottom: 5px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="alert-box">
+        <div class="icon">🚫</div>
+        <h1>Access Denied</h1>
+        <p>Our security system has detected suspicious activity coming from your IP address. To protect the integrity of our network, access has been temporarily restricted.</p>
+        
+        <div class="details">
+            <div class="reason">Source IP: <strong>{{ ip }}</strong></div>
+            <div class="reason">Trust Score: <strong>{{ score }}</strong></div>
+            <div>Reason: <strong>{{ reason }}</strong></div>
+        </div>
+
+        <p style="font-size: 13px;">If you believe this is an error, please contact the system administrator to request a manual unblock.</p>
+        
+        <a href="mailto:admin@nexusnews.com" class="btn">Contact Administrator</a>
+    </div>
+</body>
+</html>

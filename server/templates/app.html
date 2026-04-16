@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus News | Global Tech Feed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #121212;
+            --accent: #0070f3;
+            --text-primary: #ffffff;
+            --text-secondary: #888888;
+            --border: #333333;
+            --card-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .navbar {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            padding: 0 50px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(18, 18, 18, 0.8);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(90deg, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 50px auto;
+            padding: 0 20px;
+        }
+
+        .hero {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 60px;
+            height: 450px;
+            display: flex;
+            align-items: flex-end;
+            background: linear-gradient(180deg, transparent, rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .hero-content {
+            padding: 40px;
+            max-width: 700px;
+        }
+
+        .tag {
+            background: var(--accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .hero h1 {
+            font-size: 42px;
+            line-height: 1.1;
+            margin: 0 0 20px;
+            font-weight: 800;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .news-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+            cursor: pointer;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            border-color: #555;
+        }
+
+        .card-img {
+            height: 200px;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .card-content {
+            padding: 24px;
+        }
+
+        .card-content h3 {
+            font-size: 18px;
+            margin: 0 0 12px;
+            font-weight: 700;
+        }
+
+        .card-content p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        footer {
+            margin-top: 100px;
+            padding: 50px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; }
+            .hero h1 { font-size: 32px; }
+            .hero { height: 350px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">NEXUS NEWS</div>
+    </nav>
+
+    <div class="container">
+        <section class="hero">
+            <div class="hero-content">
+                <span class="tag">CYBERSECURITY</span>
+                <h1>Adaptive AI Defends Against New-Wave DDoS Attacks</h1>
+                <p style="color: #ccc;">Recent breakthoughs in behavioral analysis allow real-time systems to fingerprint malicious bots with 99.9% accuracy.</p>
+            </div>
+        </section>
+
+        <div class="grid">
+            <div class="news-card">
+                <div class="card-img" style="background-image: url('https://images.unsplash.com/photo-1614064641938-3bbee52942c7?q=80&w=2070&auto=format&fit=crop');"></div>
+                <div class="card-content">
+                    <span class="tag" style="background:#555;">TECH</span>
+                    <h3>The Rise of 5G and Edge Security</h3>
+                    <p>As networks move faster, the latency of security detection must drop to sub-millisecond ranges to prevent service disruption.</p>
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-img" style="background-image: url('https://images.unsplash.com/photo-1558494949-ef010cbdcc4b?q=80&w=2068&auto=format&fit=crop');"></div>
+                <div class="card-content">
+                    <span class="tag" style="background:#d29922;">SECURITY</span>
+                    <h3>Zero-Trust Architecture: A New Paradigm</h3>
+                    <p>Moving beyond simple firewalls, organizations are now verifying every single request based on behavior and intent.</p>
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-img" style="background-image: url('https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=2070&auto=format&fit=crop');"></div>
+                <div class="card-content">
+                    <span class="tag" style="background:#f85149;">ALERT</span>
+                    <h3>Global Botnet Tracker: Live Map</h3>
+                    <p>Real-time visualization of coordinated bot activities originating from fragmented IOT networks across the globe.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 Nexus News Network. Protected by AI-Powered Hybrid IDS.
+    </footer>
+</body>
+</html>

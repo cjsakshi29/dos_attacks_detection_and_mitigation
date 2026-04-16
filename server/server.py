@@ -11,12 +11,6 @@ import matplotlib
 matplotlib.use('Agg') # Headless mode for server graphics
 import matplotlib.pyplot as plt
 import io
-from detector import TrustManager
-import os
-import time
-import threading
-import csv
-from datetime import datetime
 
 app = Flask(__name__)
 
@@ -44,6 +38,30 @@ def write_to_csv(entry):
                 entry['ratio'], entry['status'], entry['confidence'], entry['reason']
             ])
 
+def process_detection(client_ip, byte_size, payload=""):
+    """Unified logic for detection, trust scoring, and logging."""
+    score, status, metrics, is_blocked = detector.log_request(client_ip, byte_size, payload)
+    
+    log_entry = {
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "ip": client_ip,
+        "score": f"{score:.1f}",
+        "rps": f"{metrics['rps']:.1f}",
+        "rpm": metrics['rpm'],
+        "kb_s": f"{metrics['kb_s']:.2f}",
+        "ratio": f"{metrics['ratio']:.1f}",
+        "status": status,
+        "confidence": f"{metrics['confidence']*100:.0f}%",
+        "reason": metrics['reason']
+    }
+    
+    activity_logs.append(log_entry)
+    if len(activity_logs) > MAX_LOGS:
+        activity_logs.pop(0)
+        
+    write_to_csv(log_entry)
+    return score, status, metrics, is_blocked
+
 def background_recovery():
     """Thread function to run auto-recovery periodically."""
     while True:
@@ -70,7 +88,6 @@ threading.Thread(target=background_recovery, daemon=True).start()
 @app.route('/')
 def dashboard():
     ip_summary = []
-    # Collect summary data
     for ip, score in detector.trust_scores.items():
         status, _ = detector.get_status(score)
         ip_summary.append({
@@ -89,10 +106,27 @@ def dashboard():
                           },
                           last_updated=datetime.now().strftime("%H:%M:%S"))
 
+@app.route('/app')
+def protected_app():
+    """The user-facing protected News Feed application with DPI and Hardware-Adaptive logic."""
+    client_ip = request.remote_addr
+    byte_size = 1200 # Estimated page size in bytes
+    payload = str(request.args.to_dict()) if request.args else ""
+    
+    score, status, metrics, is_blocked = process_detection(client_ip, byte_size, payload)
+    
+    if is_blocked:
+        return render_template('error_403.html', 
+                             ip=client_ip, 
+                             score=f"{score:.1f}", 
+                             reason=metrics['reason']), 403
+
+    detector.log_success(client_ip)
+    return render_template('app.html')
+
 @app.route('/unblock/<ip>')
 def unblock_ip(ip):
     if detector.unblock(ip):
-        # Log the manual unblock
         log_entry = {
             "timestamp": datetime.now().strftime("%H:%M:%S"),
             "ip": ip,
@@ -109,7 +143,6 @@ def unblock_ip(ip):
 
 @app.route('/status_api')
 def status_api():
-    # Return current metrics to feed real-time Chart.js tracking
     ip_summary = []
     normal, suspicious, blocked = 0, 0, 0
     total_trust = 0
@@ -151,48 +184,35 @@ def status_api():
 @app.route('/generate_report', methods=['POST'])
 def generate_report():
     try:
-        start_datetime = request.form.get('start_time') # Format: 2026-04-16T13:00
+        start_datetime = request.form.get('start_time')
         end_datetime = request.form.get('end_time')
-        
-        if not os.path.exists(LOG_FILE):
-            return "No log data available.", 404
+        if not os.path.exists(LOG_FILE): return "No log data available.", 404
             
-        # Analyze CSV Data
         df = pd.read_csv(LOG_FILE)
-        
-        # Original timestamp in CSV is just HH:MM:SS format, so we map it to today's date for this simulation.
-        # Since the system logs only time currently, we assume the logs belong to the current day.
         df['dt'] = pd.to_datetime('today').normalize() + pd.to_timedelta(df['Timestamp'])
         
         if start_datetime and end_datetime:
-            # Parse datetime-local strings
             s_dt = pd.to_datetime(start_datetime)
             e_dt = pd.to_datetime(end_datetime)
             df = df[(df['dt'] >= s_dt) & (df['dt'] <= e_dt)]
             
-        if len(df) == 0:
-            return "No data for selected timeframe.", 404
+        if len(df) == 0: return "No data for selected timeframe.", 404
             
-        # Draw the Graphs
         plt.style.use('dark_background')
         fig, axs = plt.subplots(3, 1, figsize=(10, 15))
         fig.suptitle(f'Security Performance/Analytics Report', fontsize=16)
 
-        # Graph 1: Traffic Volume over Time
         axs[0].plot(df['Timestamp'], df['RPS'], label='RPS', color='#3b82f6')
         axs[0].set_title('Network Volume (RPS)')
         axs[0].set_ylabel('Requests / Sec')
         axs[0].tick_params(axis='x', rotation=45)
-        # Limit x-ticks to prevent overlap
         axs[0].xaxis.set_major_locator(plt.MaxNLocator(5))
         
-        # Graph 2: Trust Score Degradation
         axs[1].scatter(df['Timestamp'], df['Score'], color='#10b981', alpha=0.5)
         axs[1].set_title('Trust Score Fluctuations')
         axs[1].set_ylabel('Trust (0-100)')
         axs[1].xaxis.set_major_locator(plt.MaxNLocator(5))
         
-        # Graph 3: Threat Types
         status_counts = df['Status'].value_counts()
         colors = {'NORMAL': '#10b981', 'SUSPICIOUS': '#f59e0b', 'BLOCKED': '#ef4444'}
         plot_colors = [colors.get(x, '#888') for x in status_counts.index]
@@ -200,8 +220,6 @@ def generate_report():
         axs[2].set_title('Traffic Classification Distribution')
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        
-        # Save to memory
         pdf_buffer = io.BytesIO()
         plt.savefig(pdf_buffer, format='pdf')
         pdf_buffer.seek(0)
@@ -209,47 +227,22 @@ def generate_report():
         
         filename = f"SOC_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
-        
     except Exception as e:
-        print(e)
-        return "Failed to generate report", 500
+        return f"Failed to generate report: {str(e)}", 500
 
 @app.route('/api', methods=['GET', 'POST'])
 def handle_api():
     client_ip = request.remote_addr
     byte_size = request.content_length if request.content_length else len(request.data) + 500
-    
-    # Extract payload for Deep Packet Inspection
     payload = request.get_data(as_text=True)
     
-    score, status, metrics, is_blocked = detector.log_request(client_ip, byte_size, payload)
+    score, status, metrics, is_blocked = process_detection(client_ip, byte_size, payload)
     
     if not is_blocked:
         @after_this_request
         def mark_success(response):
-            if response.status_code == 200:
-                detector.log_success(client_ip)
+            if response.status_code == 200: detector.log_success(client_ip)
             return response
-
-    log_entry = {
-        "timestamp": datetime.now().strftime("%H:%M:%S"),
-        "ip": client_ip,
-        "score": f"{score:.1f}",
-        "rps": f"{metrics['rps']:.1f}",
-        "rpm": metrics['rpm'],
-        "kb_s": f"{metrics['kb_s']:.2f}",
-        "ratio": f"{metrics['ratio']:.1f}",
-        "status": status,
-        "confidence": f"{metrics['confidence']*100:.0f}%",
-        "reason": metrics['reason']
-    }
-    
-    activity_logs.append(log_entry)
-    if len(activity_logs) > MAX_LOGS:
-        activity_logs.pop(0)
-        
-    # Write to CSV
-    write_to_csv(log_entry)
 
     if is_blocked:
         return jsonify({
@@ -260,14 +253,9 @@ def handle_api():
             "status": "BLOCKED"
         }), 403
 
-    return jsonify({
-        "message": "Request allowed",
-        "trust_score": score,
-        "metrics": metrics,
-        "status": status
-    })
+    return jsonify({"message": "Request allowed", "trust_score": score, "metrics": metrics, "status": status})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    print(f"Resilience-Enabled DDoS Protection Server starting on port {port}...")
+    print(f"🚀 Integrated Multi-Novelty Server starting on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=False)
