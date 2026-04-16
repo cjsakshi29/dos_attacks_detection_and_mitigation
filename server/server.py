@@ -95,12 +95,15 @@ def unblock_ip(ip):
         return redirect(url_for('dashboard'))
     return "IP not found", 404
 
-@app.route('/api')
+@app.route('/api', methods=['GET', 'POST'])
 def handle_api():
     client_ip = request.remote_addr
     byte_size = request.content_length if request.content_length else len(request.data) + 500
     
-    score, status, metrics, is_blocked = detector.log_request(client_ip, byte_size)
+    # Extract payload for Deep Packet Inspection
+    payload = request.get_data(as_text=True)
+    
+    score, status, metrics, is_blocked = detector.log_request(client_ip, byte_size, payload)
     
     if not is_blocked:
         @after_this_request

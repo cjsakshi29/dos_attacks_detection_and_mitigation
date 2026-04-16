@@ -21,7 +21,12 @@ def send_requests(url, count, delay, mode):
         try:
             start_time = time.time()
             # The server now listens at /api for traffic
-            response = requests.get(url, timeout=5)
+            if mode == "payload_attack":
+                # Send malicious Layer 7 payload
+                response = requests.post(url, data="<script>alert('XSS')</script>", timeout=5)
+            else:
+                response = requests.get(url, timeout=5)
+            
             latency = (time.time() - start_time) * 1000
             
             status_code = response.status_code
@@ -60,7 +65,7 @@ def main():
     parser = argparse.ArgumentParser(description="DDoS Simulation Client")
     # Defaulting to 5001 as previously identified the port conflict
     parser.add_argument("--url", default="http://127.0.0.1:5001", help="Server URL (e.g., http://192.168.1.5:5001)")
-    parser.add_argument("--mode", choices=["normal", "attack"], default="normal", help="Traffic mode")
+    parser.add_argument("--mode", choices=["normal", "attack", "payload_attack"], default="normal", help="Traffic mode")
     args = parser.parse_args()
 
     if args.mode == "normal":
@@ -69,6 +74,10 @@ def main():
     elif args.mode == "attack":
         # Rapid requests: 50 req, 0.1s delay
         send_requests(args.url, count=50, delay=0.1, mode="attack")
+    elif args.mode == "payload_attack":
+        # Slow requests (will bypass volume limit), but sends malicious signature
+        print("\n[!] Sending Malicious Payload Signature (Layer 7 Attack)")
+        send_requests(args.url, count=3, delay=2.0, mode="payload_attack")
 
 if __name__ == "__main__":
     try:

@@ -15,6 +15,13 @@ class TrustManager:
         self.byte_rate_limit = 500.0        # KB/s
         self.recovery_threshold = 25.0      # Seconds of inactivity before recovery
         
+        # Deep Packet Inspection Signatures (Novelty)
+        self.malicious_signatures = [
+            "<script>", "javascript:", "onerror=", "onload=",  # XSS
+            "UNION SELECT", "OR 1=1", "--", "DROP TABLE",      # SQLi
+            "../../", "/etc/passwd", "cmd.exe"                 # LFI / RCE
+        ]
+        
         # Load the ML Model
         model_path = os.path.join(os.path.dirname(__file__), 'ddos_model.pkl')
         if os.path.exists(model_path):
@@ -53,8 +60,8 @@ class TrustManager:
         while history and history[0] < now - window:
             history.popleft()
 
-    def log_request(self, ip, byte_size=0):
-        """Logs a request and computes dual-engine metrics."""
+    def log_request(self, ip, byte_size=0, payload=""):
+        """Logs a request and computes dual-engine metrics including DPI."""
         now = time.time()
         self.last_seen[ip] = now
         
@@ -110,8 +117,17 @@ class TrustManager:
                 }])
                 confidence = self.model.predict_proba(X)[0][1]
         
-        # 3. Decision Logic (Dual Engine)
+        # 3. Decision Logic (Dual Engine & DPI)
         penalty = 0.0
+        
+        # Deep Packet Inspection (Layer 7 Novelty)
+        if payload:
+            payload_upper = payload.upper()
+            for sig in self.malicious_signatures:
+                if sig.upper() in payload_upper:
+                    penalty += 100  # Instant critical penalty
+                    reasons.append(f"Signature Match: {sig}")
+                    break  # Stop checking signatures if one matches
         
         # AI Penalty
         if confidence > 0.5:
